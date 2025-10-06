@@ -1,0 +1,41 @@
+"""АНАЛИЗ ИНФОРМАЦИИ О КНИГАХ И АВТОРАХ"""
+df_books = spark.read.csv('stepik_files/books.csv', header=True)
+df_authors = spark.read.csv('stepik_files/authors.csv', header=True)
+
+"""Преобразуйте столбцы publish_date и birth_date в формат даты."""
+df_books = df_books.withColumn('publish_date', F.col('publish_date').cast(DateType()))
+df_authors = df_authors.withColumn('birth_date', F.col('birth_date').cast(DateType()))
+
+"""Объедините таблицы books и authors по author_id"""
+df_joined = df_authors.alias('a') \
+            .join(df_books.alias('b'), F.col('a.author_id') == F.col('b.author_id'), how='left') \
+            .select('a.author_id', 'name', 'birth_date', 'country',
+                    'book_id', 'title', 'genre', 'price', 'publish_date')
+
+"""Найдите топ-5 авторов, книги которых принесли наибольшую выручку."""
+df_top_5 = df_joined.groupby('author_id', 'name') \
+            .agg(F.round(F.sum('price'), 2).alias('total_revenue')) \
+            .orderBy(F.col('total_revenue').desc()) \
+            .limit(5)
+df_top_5.show()
+
+"""Найдите количество книг в каждом жанре."""
+df_genre_cnt = df_joined.groupBy('genre') \
+                .count() \
+                .filter(F.col('genre').isNotNull()) \
+                .orderBy(F.col('count').desc())
+df_genre_cnt.show()
+
+"""Подсчитайте среднюю цену книг по каждому автору."""
+df_avg_price = df_joined.groupby('author_id') \
+                .agg(F.avg('price').alias('avg_price')) \
+                .filter(F.col('avg_price').isNotNull()) \
+                .orderBy(F.col('avg_price').desc())
+df_avg_price.show()
+
+"""Найдите книги, опубликованные после 2000 года, и отсортируйте их по цене."""
+df_after_2000 = df_joined.filter(F.year('publish_date') > 2000) \
+                .orderBy(F.col('price').desc())
+df_after_2000.show()
+
+spark.stop()
