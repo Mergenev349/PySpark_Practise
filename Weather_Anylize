@@ -1,0 +1,44 @@
+import os
+from pyspark.sql.types import StructType, StructField, StringType, FloatType, DateType
+
+python_path = r"C:\Program Files\Python3_11\python.exe"
+
+os.environ['PYSPARK_PYTHON'] = python_path
+os.environ['PYSPARK_DRIVER_PYTHON'] = python_path
+
+from pyspark.sql import SparkSession, functions as F
+
+spark = SparkSession.builder \
+    .appName("Spark_Practise") \
+    .master('local[*]') \
+    .getOrCreate()
+
+
+"""АНАЛИЗ ОСАДКОВ ЗА НЕСКОЛЬКО ЛЕТ."""
+schema = StructType([
+    StructField('station_id', StringType(), True),
+    StructField('date', DateType(), True),
+    StructField('temperature', FloatType(), True),
+    StructField('precipitation', FloatType(), True),
+    StructField('wind_speed', FloatType(), True),
+])
+df = spark.read.csv('stepik_files/weather_data.csv', header=True, schema=schema)
+
+"""Найдите топ-5 самых жарких дней за все время наблюдений."""
+df.select('date', 'temperature').orderBy(df.temperature.desc()).show(5)
+
+"""Найдите метеостанцию с наибольшим количеством осадков за последний год."""
+df_max_precip = df.select('station_id', 'precipitation', 'date') \
+    .filter(F.year(F.col('date')) == 2023) \
+    .select('station_id', 'precipitation') \
+    .groupby('station_id') \
+    .agg(F.sum('precipitation').alias('sum_precipitation')) \
+    .orderBy(F.col('sum_precipitation').desc()) \
+    .limit(1)
+df_max_precip.show()
+
+"""Подсчитайте среднюю температуру по месяцам за все время наблюдений."""
+df.createOrReplaceTempView("weather_data")
+df_avg_temp = spark.sql("SELECT EXTRACT(MONTH FROM date) as m_date, AVG(temperature) AS avg_temperature FROM weather_data "
+                        "GROUP BY EXTRACT(MONTH FROM date) ORDER BY m_date")
+df_avg_temp.show()
