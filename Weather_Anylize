@@ -42,3 +42,5 @@ df.createOrReplaceTempView("weather_data")
 df_avg_temp = spark.sql("SELECT EXTRACT(MONTH FROM date) as m_date, AVG(temperature) AS avg_temperature FROM weather_data "
                         "GROUP BY EXTRACT(MONTH FROM date) ORDER BY m_date")
 df_avg_temp.show()
+
+spark.stop()
